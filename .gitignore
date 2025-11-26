@@ -1,0 +1,17 @@
+# Configurações de IDE
+.idea/
+.venv/
+
+# Compilação e binários
+bin/
+obj/
+
+# Arquivos temporários e caches
+*.tmp
+*.log
+*.cache
+
+# Build de Revit Addins
+*.addin
+*.rvt~
+*.bak
