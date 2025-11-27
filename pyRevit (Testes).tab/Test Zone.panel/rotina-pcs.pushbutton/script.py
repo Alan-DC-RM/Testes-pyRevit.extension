@@ -66,18 +66,19 @@ for r in result:
                         )
 
         # Então pegamos todas as Fundações - blocos ou sapatas, indo pelo filtro "not_cubetas", removendo de todas as
-        # connections apenas as cubetas. Isso pode ser um problema se tivermos Connections que não são cubetas, mas
-        # precisaríamos tirar
+        # connections apenas as cubetas e blocos de transição. Isso pode ser um problema se tivermos Connections que
+        # não são cubetas, mas precisaríamos tirar
         sconnections = (FilteredElementCollector(doc) \
                         .OfCategory(BuiltInCategory.OST_StructConnections) \
                         .WhereElementIsNotElementType() \
                         .ToElements())
-        not_cubetas = []
+        funds = []
         for s in sconnections:
             tipo = s.Symbol
             famname = tipo.FamilyName
             if not famname == "Cubeta":
-                not_cubetas.append(s)
+                if not "Trans" not in famname:
+                    funds.append(s)
 
         # Então pegamos todos os pilares, filtramos pelos primeiros lances (chave -> //0)
         scolumns = FilteredElementCollector(doc) \
@@ -89,17 +90,18 @@ for r in result:
 
         for p in scolumns:
             chave = p.LookupParameter("Chave").AsString()
-            if "//0" in chave and chave:
-                ponto = p.Location.Point
-                x = ponto.X
-                y = ponto.Y
-                z = p.get_BoundingBox(None).Min.Z
-                dict_pilares[p] = [x, y, z]
-                # Eu usei esse dicionário para ter o pilar como chave e a chave é uma lista de três índices:
-                # lista[0] = ponto X do pilar, do CG
-                # lista[1] = ponto Y do pilar, do CG
-                # lista[2] = ponto Z do pilar, menor ponto da geometria dele (BoundingBox). O CG ficaria no meio dele
-                # No fim, essa lista representa o CG na face inferior do pilar
+            if chave:
+                if "//0" in chave:
+                    ponto = p.Location.Point
+                    x = ponto.X
+                    y = ponto.Y
+                    z = p.get_BoundingBox(None).Min.Z
+                    dict_pilares[p] = [x, y, z]
+                    # Eu usei esse dicionário para ter o pilar como chave e a chave é uma lista de três índices:
+                    # lista[0] = ponto X do pilar, do CG
+                    # lista[1] = ponto Y do pilar, do CG
+                    # lista[2] = ponto Z do pilar, menor ponto da geometria dele (BoundingBox). O CG ficaria no meio del
+                    # No fim, essa lista representa o CG na face inferior do pilar
 
         # Então passamos para a etapa de filtrar os blocos/fundações que não tenham pilares imediatamente acima.
         # No Dynamo isso é feito por um Node só, aqui, fizemos a lógica do zero.
@@ -107,7 +109,7 @@ for r in result:
         # anterior está dentro dos limites de XY dela, além de estar na mesma altura (Z igual)
         fund_sem_pilar = []
 
-        for fund in not_cubetas:
+        for fund in funds:
             encontrou_pilar = False
             x_fund_min = fund.get_BoundingBox(None).Min.X
             x_fund_max = fund.get_BoundingBox(None).Max.X
@@ -137,6 +139,7 @@ for r in result:
                 y_pc = anot.Location.Point.Y
                 lista_xy_existente.append([x_pc, y_pc])
 
+        # A transação é onde, de fato, criamos as instâncias de PCs
         t = Transaction(doc, __title__)
         t.Start()
 
@@ -144,18 +147,20 @@ for r in result:
         symbol_id_list = List[ElementId](symbol_ids)
         symbols = [doc.GetElement(id) for id in symbol_id_list]
         for funda in fund_sem_pilar:
-            ponto_inser = funda.Location.Point
+            ponto_inser = funda.Location.Point  # Usamos o ponto de inserção sendo o Location Point da fundação
             ponto_inser_x = ponto_inser.X
             ponto_inser_y = ponto_inser.Y
             lista_inser = [ponto_inser_x, ponto_inser_y]
+            # Só criamos para os pontos que não tenham um PC já criado, com base na lista populada na etapa anterior
             if lista_inser not in lista_xy_existente:
-                doc.Create.NewFamilyInstance(ponto_inser, symbols[0], vista_ativa)
+                new_pc = doc.Create.NewFamilyInstance(ponto_inser, symbols[0], vista_ativa)
+                tit = funda.LookupParameter("Titulo").AsString()
+                new_pc.LookupParameter("Titulo").Set(tit)
 
         t.Commit()
 
-    '''
     if r == op2:
-        #Preencher as cargas a partir da tabela
+        #Código da opção 2 - Preencher Cargas
         input_tabela = forms.ask_for_string(
             default="R00-EX-Cargas-21-10-2025",
             prompt="Nome da aba",
@@ -177,4 +182,3 @@ for r in result:
 
         wb.Close(False)
         excel.Quit()
-'''
