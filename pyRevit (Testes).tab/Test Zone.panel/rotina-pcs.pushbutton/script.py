@@ -77,7 +77,7 @@ for r in result:
             tipo = s.Symbol
             famname = tipo.FamilyName
             if not famname == "Cubeta":
-                if not "Trans" not in famname:
+                if "Trans" not in famname:
                     funds.append(s)
 
         # Então pegamos todos os pilares, filtramos pelos primeiros lances (chave -> //0)
