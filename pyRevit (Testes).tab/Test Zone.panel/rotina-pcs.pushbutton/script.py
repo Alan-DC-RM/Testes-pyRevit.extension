@@ -161,14 +161,19 @@ for r in result:
 
     if r == op2:
         # Código da opção 2 - Preencher Cargas
-        """
-        input_tabela = forms.ask_for_string(
-            default="R00-EX-Cargas-21-10-2025",
-            prompt="Nome da aba",
-            title="Excel"
-        )
-        """
         excel_file = forms.pick_file()
+        if excel_file:
+            exten = excel_file.split(".")[-1]
+            if exten != "xlsm" and exten != "xlsx":
+                forms.alert(msg="Seleção Inválida",
+                            sub_msg="Tente novamente e selecione um arquivo Excel (xlsx ou xlsm).\n\n" +
+                                    "Se o problema persistir, chame a equipe BIM para te auxiliar",
+                            exitscript=True
+                            )
+        else:
+            forms.alert(msg="Seleção cancelada",
+                        exitscript=True
+                        )
         excel = Excel.ApplicationClass()
         wb = excel.Workbooks.Open(excel_file)
         for ws in wb.Sheets:
