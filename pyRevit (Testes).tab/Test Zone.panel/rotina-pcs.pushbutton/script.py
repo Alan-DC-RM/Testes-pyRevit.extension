@@ -135,8 +135,8 @@ for r in result:
             .ToElements()
         for anot in annotations_vista_ativa:
             if anot.Symbol.Family.Id == ponto_de_carga.Id:
-                x_pc = anot.Location.Point.X
-                y_pc = anot.Location.Point.Y
+                x_pc = round(anot.Location.Point.X, 2)
+                y_pc = round(anot.Location.Point.Y, 2)
                 lista_xy_existente.append([x_pc, y_pc])
 
         # A transação é onde, de fato, criamos as instâncias de PCs
@@ -148,8 +148,8 @@ for r in result:
         symbols = [doc.GetElement(id) for id in symbol_id_list]
         for funda in fund_sem_pilar:
             ponto_inser = funda.Location.Point  # Usamos o ponto de inserção sendo o Location Point da fundação
-            ponto_inser_x = ponto_inser.X
-            ponto_inser_y = ponto_inser.Y
+            ponto_inser_x = round(ponto_inser.X, 2)
+            ponto_inser_y = round(ponto_inser.Y, 2)
             lista_inser = [ponto_inser_x, ponto_inser_y]
             # Só criamos para os pontos que não tenham um PC já criado, com base na lista populada na etapa anterior
             if lista_inser not in lista_xy_existente:
@@ -160,25 +160,25 @@ for r in result:
         t.Commit()
 
     if r == op2:
-        #Código da opção 2 - Preencher Cargas
+        # Código da opção 2 - Preencher Cargas
+        """
         input_tabela = forms.ask_for_string(
             default="R00-EX-Cargas-21-10-2025",
             prompt="Nome da aba",
             title="Excel"
         )
-
-        values = []
-
-        
+        """
+        excel_file = forms.pick_file()
         excel = Excel.ApplicationClass()
         wb = excel.Workbooks.Open(excel_file)
-        ws = wb.Sheets(1)
+        for ws in wb.Sheets:
+            print(ws.Name)
 
         values = []
         for row in range(41, ws.UsedRange.Rows.Count + 1):
             values.append(ws.Cells(row, 41).Value2)
 
-        print(values)
+        #print(values)
 
         wb.Close(False)
         excel.Quit()
