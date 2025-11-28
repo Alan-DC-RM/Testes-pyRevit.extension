@@ -35,6 +35,20 @@ if not result:
                 exitscript=True
                 )
 
+# Verificamos se a família de Ponto de Carga está carregada no projeto antes de mais nada, pois ela é necessária para os
+# 2 casos que temos dessa automação
+fams = FilteredElementCollector(doc).OfClass(Family).ToElements()
+achou = False
+for fam in fams:
+    if fam.Name == "Ponto de Carga":
+        ponto_de_carga = fam
+        achou = True
+        break
+if not achou:
+    forms.alert("Família de Ponto de Carga não carregada no modelo ou com nome alterado",
+                title="Alerta!",
+                exitscript=True
+                )
 
 # Código de fato, com base no resultado
 for r in result:
@@ -48,20 +62,6 @@ for r in result:
         if "locação" not in nome_tipo_vista.lower():
             forms.alert(msg="Vista ativa não é uma planta de Locação",
                         sub_msg="Ou pode ser que o nome do Tipo da Vista não tenha \'Locação\' escrito",
-                        exitscript=True
-                        )
-
-        # Na sequência, verificamos se a família de Ponto de Carga está carregada no projeto
-        fams = FilteredElementCollector(doc).OfClass(Family).ToElements()
-        achou = False
-        for fam in fams:
-            if fam.Name == "Ponto de Carga":
-                ponto_de_carga = fam
-                achou = True
-                break
-        if not achou:
-            forms.alert("Família de Ponto de Carga não carregada no modelo ou com nome alterado",
-                        title="Alerta!",
                         exitscript=True
                         )
 
@@ -140,7 +140,9 @@ for r in result:
                 lista_xy_existente.append([x_pc, y_pc])
 
         # A transação é onde, de fato, criamos as instâncias de PCs
-        t = Transaction(doc, __title__)
+
+        t = Transaction(doc, "Inserir PCs")
+
         t.Start()
 
         symbol_ids = ponto_de_carga.GetFamilySymbolIds()
@@ -154,8 +156,9 @@ for r in result:
             # Só criamos para os pontos que não tenham um PC já criado, com base na lista populada na etapa anterior
             if lista_inser not in lista_xy_existente:
                 new_pc = doc.Create.NewFamilyInstance(ponto_inser, symbols[0], vista_ativa)
-                tit = funda.LookupParameter("Titulo").AsString()
-                new_pc.LookupParameter("Titulo").Set(tit)
+                tit = funda.LookupParameter("Titulo").AsString() #S91 ou
+                tit_subst_pc = tit.replace("B", "PC").replace("S", "PC")
+                new_pc.LookupParameter("Titulo").Set(tit_subst_pc)
 
         t.Commit()
 
@@ -184,6 +187,10 @@ for r in result:
                                           title="Selecione a planilha onde está o Despil desejado",
                                           multiselect=False
                                           )
+        if not sheet:
+            forms.alert(msg="Seleção cancelada",
+                        exitscript=True
+                        )
         for ro in range(1, sheet.UsedRange.Rows.Count + 1):
             for c in range(1, sheet.UsedRange.Columns.Count + 1):
                 try:
@@ -197,21 +204,49 @@ for r in result:
                     break
             if despil_col:
                 break
-        valores = []
+        valores = {}
         if despil_col:
             row = despil_row + 2  # começa duas linhas abaixo
             while True:
-                titulo = sheet.Cells(row, despil_col).Value2
-                carga = sheet.Cells(row, despil_col + 1).Value2
+                titulo_excel = sheet.Cells(row, despil_col).Value2
+                titulo_dict = str(titulo_excel).strip()
+                carga_excel = sheet.Cells(row, despil_col + 1).Value2
+                carga_dict = str(carga_excel).strip()
                 if (
-                        (titulo is None or str(titulo).strip() == "")
+                        (titulo_excel is None or titulo_dict == "")
                         and
-                        (carga is None or str(carga).strip() == "")
+                        (carga_excel is None or carga_dict == "")
                 ):
                     break
-                valores.append((titulo, carga))
+                valores[titulo_dict] = float(carga_dict)
                 row += 1
-        for valor in valores:
-            print(valor)
         excel_file.Close(False)
         excel_program.Quit()
+
+        struct_cols = FilteredElementCollector(doc) \
+            .OfCategory(BuiltInCategory.OST_StructuralColumns) \
+            .WhereElementIsNotElementType() \
+            .ToElements()
+
+        annotations = FilteredElementCollector(doc)\
+            .OfCategory(BuiltInCategory.OST_GenericAnnotation)\
+            .WhereElementIsNotElementType()\
+            .ToElements()
+        pcs = []
+        for anote in annotations:
+            if anote.Symbol.Family.Id == ponto_de_carga.Id:
+                pcs.append(anote)
+
+        t = Transaction(doc, "Preencher cargas")
+
+        t.Start()
+
+        for pilar in struct_cols:
+            titulo_pilar = pilar.LookupParameter("Titulo").AsString()
+            if titulo_pilar in valores.keys():
+                pilar.LookupParameter("Carga").Set(valores[titulo_pilar])
+        for pc in pcs:
+            titulo_pc = pc.LookupParameter("Titulo").AsString()
+            if titulo_pc in valores.keys():
+                pc.LookupParameter("Carga").Set(valores[titulo_pc])
+        t.Commit()
