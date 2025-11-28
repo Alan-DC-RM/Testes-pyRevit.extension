@@ -161,9 +161,9 @@ for r in result:
 
     if r == op2:
         # Código da opção 2 - Preencher Cargas
-        excel_file = forms.pick_file()
-        if excel_file:
-            exten = excel_file.split(".")[-1]
+        excel_file_path = forms.pick_file()
+        if excel_file_path:
+            exten = excel_file_path.split(".")[-1]
             if exten != "xlsm" and exten != "xlsx":
                 forms.alert(msg="Seleção Inválida",
                             sub_msg="Tente novamente e selecione um arquivo Excel (xlsx ou xlsm).\n\n" +
@@ -174,16 +174,44 @@ for r in result:
             forms.alert(msg="Seleção cancelada",
                         exitscript=True
                         )
-        excel = Excel.ApplicationClass()
-        wb = excel.Workbooks.Open(excel_file)
-        for ws in wb.Sheets:
-            print(ws.Name)
+        excel_program = Excel.ApplicationClass()
+        excel_file = excel_program.Workbooks.Open(excel_file_path)
+        opts_planilhas = []
+        for planilha in excel_file.Sheets:
+            opts_planilhas.append(planilha)
+        # Nesse método do Forms, pelo visto, ele já puxa o .Name das planilhas quando exibe na lista. Legal!
+        sheet = forms.SelectFromList.show(opts_planilhas,
+                                          title="Selecione a planilha onde está o Despil desejado",
+                                          multiselect=False
+                                          )
+        for ro in range(1, sheet.UsedRange.Rows.Count + 1):
+            for c in range(1, sheet.UsedRange.Columns.Count + 1):
+                try:
+                    cell_value = sheet.Cells(ro, c).Value2
+                except:
+                    cell_value = None
 
-        values = []
-        for row in range(41, ws.UsedRange.Rows.Count + 1):
-            values.append(ws.Cells(row, 41).Value2)
-
-        #print(values)
-
-        wb.Close(False)
-        excel.Quit()
+                if cell_value == "DESPIL":
+                    despil_col = c
+                    despil_row = ro
+                    break
+            if despil_col:
+                break
+        valores = []
+        if despil_col:
+            row = despil_row + 2  # começa duas linhas abaixo
+            while True:
+                titulo = sheet.Cells(row, despil_col).Value2
+                carga = sheet.Cells(row, despil_col + 1).Value2
+                if (
+                        (titulo is None or str(titulo).strip() == "")
+                        and
+                        (carga is None or str(carga).strip() == "")
+                ):
+                    break
+                valores.append((titulo, carga))
+                row += 1
+        for valor in valores:
+            print(valor)
+        excel_file.Close(False)
+        excel_program.Quit()
