@@ -52,8 +52,9 @@ if not achou:
 
 # Código de fato, com base no resultado
 for r in result:
+
+    # Código da opção 1 - Inserir PCs
     if r == op1:
-        # Código da opção 1 - Inserir PCs
 
         # 1a etapa é verificar se a vista ativa é do Type Locação e cargas, para poder locar os PCs
         vista_ativa = doc.ActiveView
@@ -139,7 +140,7 @@ for r in result:
                 y_pc = round(anot.Location.Point.Y, 2)
                 lista_xy_existente.append([x_pc, y_pc])
 
-        # A transação é onde, de fato, criamos as instâncias de PCs
+        # A transação é onde, de fato, criamos as instâncias de PCs. Mudei o título dela, temos uma para cada opção
 
         t = Transaction(doc, "Inserir PCs")
 
@@ -162,11 +163,13 @@ for r in result:
 
         t.Commit()
 
+    # Código da opção 2 - Preencher Cargas
     if r == op2:
-        # Código da opção 2 - Preencher Cargas
+        # Primeiro vou pegar o input do arquivo do usuário
         excel_file_path = forms.pick_file()
         if excel_file_path:
-            exten = excel_file_path.split(".")[-1]
+            exten = excel_file_path.split(".")[-1] # Uso split e acesso o último item splitado, que é a extensão do arqu
+            # Só vou permitir arquivos da extensão de Excel. Não filtrei na seleção, mas eu verifico aqui depois
             if exten != "xlsm" and exten != "xlsx":
                 forms.alert(msg="Seleção Inválida",
                             sub_msg="Tente novamente e selecione um arquivo Excel (xlsx ou xlsm).\n\n" +
@@ -177,12 +180,17 @@ for r in result:
             forms.alert(msg="Seleção cancelada",
                         exitscript=True
                         )
-        excel_program = Excel.ApplicationClass()
-        excel_file = excel_program.Workbooks.Open(excel_file_path)
+
+        # Aqui vamos trabalhar com os dados do Excel
+        excel_program = Excel.ApplicationClass()        # Cria uma instância do Excel (como se você abrisse o app)
+        excel_file = excel_program.Workbooks.Open(excel_file_path) # Abre o arquivo de acordo com o path inputado
         opts_planilhas = []
-        for planilha in excel_file.Sheets:
-            opts_planilhas.append(planilha)
-        # Nesse método do Forms, pelo visto, ele já puxa o .Name das planilhas quando exibe na lista. Legal!
+        for planilha in excel_file.Sheets:              # Cada Sheet do arquivo (planilha), vamos adicionar à lista
+            opts_planilhas.append(planilha)             # Vamos ter as planilhas do doc p servir como seleção do input
+
+        # Agora pegamos o input do usuário pela última vez: A planilha do documento que ele quer usar o DESPIL
+        # O método do forms.pick_file(), pelo visto, já puxa o .Name das planilhas quando exibe na lista de seleção
+        # Podemos passar direto sem ter que fazer uma lista análoga com os Names das Sheets
         sheet = forms.SelectFromList.show(opts_planilhas,
                                           title="Selecione a planilha onde está o Despil desejado",
                                           multiselect=False
@@ -191,43 +199,57 @@ for r in result:
             forms.alert(msg="Seleção cancelada",
                         exitscript=True
                         )
+
+        # Vamos loopar toda a planilha, fazemos um range de linhas que têm valores (UsedRange) e para cada linha vamos..
         for ro in range(1, sheet.UsedRange.Rows.Count + 1):
+            # ..percorrer todas as colunas
             for c in range(1, sheet.UsedRange.Columns.Count + 1):
                 try:
+                    # Pegamos o valor da célula na linha e coluna da vez do loop
                     cell_value = sheet.Cells(ro, c).Value2
                 except:
+                    # Exceção necessária para fazer funcionar, se não da erro no if abaixo
                     cell_value = None
-
+                # Se o valor da célula for DESPIL, achamos a coluna que ela está e podemos prosseguir com a lógica
                 if cell_value == "DESPIL":
-                    despil_col = c
-                    despil_row = ro
-                    break
-            if despil_col:
-                break
-        valores = {}
-        if despil_col:
-            row = despil_row + 2  # começa duas linhas abaixo
-            while True:
-                titulo_excel = sheet.Cells(row, despil_col).Value2
-                titulo_dict = str(titulo_excel).strip()
-                carga_excel = sheet.Cells(row, despil_col + 1).Value2
-                carga_dict = str(carga_excel).strip()
-                if (
-                        (titulo_excel is None or titulo_dict == "")
-                        and
-                        (carga_excel is None or carga_dict == "")
-                ):
-                    break
-                valores[titulo_dict] = float(carga_dict)
-                row += 1
-        excel_file.Close(False)
-        excel_program.Quit()
+                    despil_col = c          # Salvamos o valor da coluna..
+                    despil_row = ro         # ..e da célula em que está o DESPIL
+                    break                   # Quebramos o loop porque já achamos o DESPIL, não precisamos mais procurar
+            if despil_col:                  # Se deslip_col tem valor, quer dizer que achamos o DESPIL..
+                break                       # ..então, quebramos o loop de linhas, na linha acima quebramos das colunas
 
+        valores = {}                        # Dicionário que será populado com {Título -> Carga}
+
+        if not despil_col:                      # Se descipl_col tem valor, achamos o despil
+            forms.alert("O programa não conseguiu achar o DESPIL na tabela.\n\nNada foi feito.", exitscript=True)
+        row = despil_row + 2  # começaremos o loop abaixo duas linhas abaixo do DESPIL, porque ele é mesclado
+        # Loop while True que vamos quebrar com o break, mais simples do que fazer um for para o range de dados
+        while True:                                                     # Esse loop percorre todas as linhas do tit|carg
+            titulo_excel = sheet.Cells(row, despil_col).Value2          # Valor do título do pilar/PC no Excel
+            titulo_dict = str(titulo_excel).strip()                     # Valor do título "limpo" para o dicionário
+            carga_excel = sheet.Cells(row, despil_col + 1).Value2       # Valor da carga do pilar/PC no Excel
+            carga_dict = str(carga_excel).strip()                       # Valor da carga "limpa" para o dicionário
+            if (
+                    (titulo_excel is None or titulo_dict == "")         # Precisei "limpar" os valores do Excel para..
+                    and                                                 # ..tirar os espaços vazios, que entravam como..
+                    (carga_excel is None or carga_dict == "")           # ..valores != de None e n eram desconsiderados
+            ):                                                          # Se uma das variáveis = None, n há mais valores
+                break                                                   # Quando não há mais valores, quebramos o loop
+            # Só vamos adicionar ao dicionário abaixo se não houve break, ou seja, ainda temos valores válidos para add
+            valores[titulo_dict] = float(carga_dict)                    # Adicionamos ao dicionário o conjunto de tit+cg
+            row += 1                                                    # Adicionamos 1 ao valor de linhas e recomeçamos
+        excel_file.Close(False)                                         # Essas duas linhas servem para fechar o..
+        excel_program.Quit()                                            # ..processo do Excel corretamente e evitar bugs
+
+
+        # Lista com todos os pilares (Struct_Columns). No Template parâmetro Carga está aplicado à categoria - n da erro
         struct_cols = FilteredElementCollector(doc) \
             .OfCategory(BuiltInCategory.OST_StructuralColumns) \
             .WhereElementIsNotElementType() \
             .ToElements()
 
+        # Para todas as anotações do projeto, filtramos pelos PCs com base na família, por isso tirei do 1º if a parte
+        # que pegamos a Family Class do ponto_de_carga
         annotations = FilteredElementCollector(doc)\
             .OfCategory(BuiltInCategory.OST_GenericAnnotation)\
             .WhereElementIsNotElementType()\
@@ -237,16 +259,21 @@ for r in result:
             if anote.Symbol.Family.Id == ponto_de_carga.Id:
                 pcs.append(anote)
 
+        # A transação é onde, de fato, criamos as instâncias de PCs. Mudei o título dela, temos uma para cada opção
+
         t = Transaction(doc, "Preencher cargas")
 
         t.Start()
 
+        # Primeiro pegamos os títulos do PILARES e setamos a carga com base no que adquirimos do Excel
         for pilar in struct_cols:
             titulo_pilar = pilar.LookupParameter("Titulo").AsString()
             if titulo_pilar in valores.keys():
                 pilar.LookupParameter("Carga").Set(valores[titulo_pilar])
+        # Segundo pegamos os títulos do PCs e setamos a carga com base no que adquirimos do Excel
         for pc in pcs:
             titulo_pc = pc.LookupParameter("Titulo").AsString()
             if titulo_pc in valores.keys():
                 pc.LookupParameter("Carga").Set(valores[titulo_pc])
+
         t.Commit()
