@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-__title__ = "Inserir PCs"
+__title__ = "Inserir PCs\nPreencher Cargas"
 __doc__ = """
 Rotina que permite a inserção da família de ponto de carga exatamente no CG de Blocos de Fundação que não tenham um
 pilar imediatamente acima, junto com a possibilidade de preencher as cargas dos PCs e pilares de acordo com a planilha
@@ -25,8 +25,8 @@ doc = __revit__.ActiveUIDocument.Document   #type: UIDocument
 
 
 # Input do usuário, janela de seleção e failsafe caso feche a janela (variável vazia)
-op1 = "Inserir PCS em blocos sem pilares"
-op2 = "Preencher cargas"
+op1 = "Inserir Pontos de Carga em blocos sem pilares em cima"
+op2 = "Preencher cargas de pilares e Pontos de Carga do projeto"
 options = [op1, op2]
 result = forms.SelectFromList.show(options, "Selecione um", multiselect=True)
 if not result:
